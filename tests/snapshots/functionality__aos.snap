@@ -1,0 +1,24 @@
+---
+source: tests/functionality.rs
+expression: nodes
+snapshot_kind: text
+---
+NodesLayout {
+    data: [
+        Node {
+            op: 0,
+            arg1: 0,
+            arg2: 0,
+        },
+        Node {
+            op: 1,
+            arg1: 1,
+            arg2: 1,
+        },
+        Node {
+            op: 2,
+            arg1: 2,
+            arg2: 2,
+        },
+    ],
+}

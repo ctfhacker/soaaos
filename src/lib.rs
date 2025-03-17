@@ -22,23 +22,17 @@ enum Layout {
 /// Example:
 ///
 /// ```rust
+/// use core::error::Error;
 /// /// The struct `NodesLayout` is created as a `struct-of-arrays`
-/// #[layout("struct-of-arrays")]
+/// #[soaaos::layout("struct-of-arrays")]
+/// // #[layout("aos")] // For Array-of-Structs
 /// struct Node {
 ///   name: String,
 ///   operation: u8,
-///   arg1: u16, 
+///   arg1: u16,
 ///   arg2: u16,
 /// }
-/// 
-/// /// The struct `NodesLayout` is created as a `array-of-structs`
-/// #[layout("aos")]
-/// struct Node {
-///   name: String,
-///   operation: u8,
-///   arg1: u16, 
-///   arg2: u16,
-/// }
+///
 /// ```
 #[proc_macro_attribute]
 pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -254,6 +248,7 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
                     }
                 )*
 
+                /*
                 pub fn diff(&self, other: &#layout_struct_ident) -> Result<()> {
                     let mut bad = false;
                     let mut out = String::new();
@@ -272,11 +267,12 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
                         println!("{}", self.to_string()?);
                         println!("OTHER");
                         println!("{}", other.to_string()?);
-                        bail!("Diff\n{out}", stringify!($field_names));
+                        panic!("Diff\n{out}", stringify!($field_names));
                     }
 
                     Ok(())
                 }
+                */
             }
         };
 

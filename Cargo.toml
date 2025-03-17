@@ -1,5 +1,5 @@
 [package]
-name = "aossoa"
+name = "soaaos"
 version = "0.1.0"
 edition = "2024"
 
@@ -9,3 +9,6 @@ syn = { version = "2.0.90", features = ["full"] }
 
 [lib]
 proc-macro = true
+
+[dev-dependencies]
+insta = "1.42.2"

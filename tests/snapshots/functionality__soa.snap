@@ -1,0 +1,22 @@
+---
+source: tests/functionality.rs
+expression: nodes_soa
+snapshot_kind: text
+---
+NodeSoasLayout {
+    op: [
+        0,
+        1,
+        2,
+    ],
+    arg1: [
+        0,
+        10,
+        20,
+    ],
+    arg2: [
+        0,
+        20,
+        40,
+    ],
+}
