@@ -1,0 +1,6 @@
+---
+source: tests/functionality.rs
+expression: diff
+snapshot_kind: text
+---
+arg1 1: 31337 vs 10

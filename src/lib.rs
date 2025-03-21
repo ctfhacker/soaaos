@@ -140,6 +140,8 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
             #(
                 #error_names,
             )*
+
+            InvalidDiff,
         }
 
         impl core::fmt::Display for #error_ident {
@@ -148,6 +150,8 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
                     #(
                         #error_ident::#error_names => write!(f, "Not Found: {}", stringify!(#error_names)),
                     )*
+
+                    InvalidDiff => write!(f, "Invalid Diff"),
                 }
             }
         }
@@ -157,6 +161,31 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
                 match self {
                     _ => None,
                 }
+            }
+        }
+
+        impl #layout_struct_ident {
+            pub fn diff(&self, other: &#layout_struct_ident) -> Option<String> {
+                use std::fmt::Write;
+
+                let mut out = String::new();
+
+                #(
+                    let this_iter = self.#field_names();
+                    let other_iter = other.#field_names();
+
+                    for (i, (o1, o2)) in this_iter.zip(other_iter).enumerate() {
+                        if *o1 != *o2 {
+                            write!(out, "\n{} {i}: {o1:?} vs {o2:?}", stringify!(#field_names)).unwrap();
+                        }
+                    }
+                )*
+
+                if !out.is_empty() {
+                    return Some(out);
+                }
+
+                None
             }
         }
     };
@@ -248,31 +277,6 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
                     }
                 )*
 
-                /*
-                pub fn diff(&self, other: &#layout_struct_ident) -> Result<()> {
-                    let mut bad = false;
-                    let mut out = String::new();
-
-                    #(
-                        for (i, (o1, o2)) in self.#field_names.iter().zip(&other.#field_names).enumerate() {
-                            if o1 != o2 {
-                                write!(out, "\n{} {i}: {o1:?} vs {o2:?}", stringify!(#field_names))?;
-                            }
-                            bad |= o1 != o2;
-                        }
-                    )*
-
-                    if bad {
-                        println!("SELF");
-                        println!("{}", self.to_string()?);
-                        println!("OTHER");
-                        println!("{}", other.to_string()?);
-                        panic!("Diff\n{out}", stringify!($field_names));
-                    }
-
-                    Ok(())
-                }
-                */
             }
         };
 
