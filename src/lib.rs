@@ -122,6 +122,11 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
         // Keep the original struct definition.
         #input
 
+        pub struct #layout_iter_ident<'a> {
+            index: #id_ident,
+            layout: &'a #layout_struct_ident,
+        }
+
         /// The index into the `nodes` vec
         #[allow(dead_code)]
         #[repr(transparent)]
@@ -196,6 +201,26 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
 
                 None
             }
+
+            pub fn iter(&self) -> #layout_iter_ident {
+                #layout_iter_ident { index: #id_ident::null(), layout: self }
+            }
+        }
+
+        impl<'a> Iterator for #layout_iter_ident<'a> {
+            type Item = #struct_ident_ref<'a>;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                let result = #struct_ident_ref {
+                    #(
+                        #field_names: self.layout.#getter_names(self.index).ok()?,
+                    )*
+                };
+
+                self.index = #id_ident(self.index.0 + 1);
+
+                Some(result)
+            }
         }
     };
 
@@ -203,11 +228,6 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
     if layout == Layout::StructOfArrays {
         let output = quote! {
             #both
-
-            pub struct #layout_iter_ident<'a> {
-                index: #id_ident,
-                layout: &'a #layout_struct_ident,
-            }
 
             /// Layout version using struct-of-arrays layout.
             #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -302,26 +322,8 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
                     }
                 )*
 
-                pub fn iter(&self) -> #layout_iter_ident {
-                    #layout_iter_ident { index: #id_ident::null(), layout: self }
-                }
             }
 
-            impl<'a> Iterator for #layout_iter_ident<'a> {
-                type Item = #struct_ident_ref<'a>;
-
-                fn next(&mut self) -> Option<Self::Item> {
-                    let result = #struct_ident_ref {
-                        #(
-                            #field_names: self.layout.#getter_names(self.index).ok()?,
-                        )*
-                    };
-
-                    self.index = #id_ident(self.index.0 + 1);
-
-                    Some(result)
-                }
-            }
         };
 
         output.into()
