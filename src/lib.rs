@@ -215,6 +215,17 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
                     }
                 }
 
+                /// Create a new layout struct with all internal vectors initialized.
+                pub fn with_capacity(size: usize) -> Self {
+                    println!("Using struct-of-arrays");
+
+                    Self {
+                        #(
+                            #field_names: Vec::with_capacity(size),
+                        )*
+                    }
+                }
+
                 pub fn len(&self) -> usize {
                     self.#first_field.len()
                 }
@@ -298,6 +309,15 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
 
                     Self {
                         data: Vec::new(),
+                    }
+                }
+
+                /// Create a new layout struct with a pre-allocated vector
+                pub fn with_capacity(size: usize) -> Self {
+                    println!("Using array-of-structs");
+
+                    Self {
+                        data: Vec::with_capacity(size),
                     }
                 }
 
