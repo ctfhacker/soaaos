@@ -205,6 +205,13 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
             pub fn iter(&self) -> #layout_iter_ident {
                 #layout_iter_ident { index: #id_ident::null(), layout: self }
             }
+
+            pub fn iter_enumerated(&self) -> impl Iterator<Item = (#id_ident, #struct_ident_ref<'_>)> {
+                self
+                .iter()
+                .enumerate()
+                .map(|(index, item)| (#id_ident(index as u32), item))
+            }
         }
 
         impl<'a> Iterator for #layout_iter_ident<'a> {
@@ -287,7 +294,7 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
                     }
                 )*
 
-
+                /// Returns a reference to the field value at the given index.
                 // Generate an individual getter for each field.
                 #(
                     /// Returns a reference to the field value at the given index.
