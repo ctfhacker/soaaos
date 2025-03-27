@@ -247,7 +247,7 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
             impl #layout_struct_ident {
                 /// Create a new layout struct with all internal vectors initialized.
                 pub fn new() -> Self {
-                    println!("Using struct-of-arrays for {}", stringify!(#struct_ident));
+                    // println!("Using struct-of-arrays for {}", stringify!(#struct_ident));
 
                     Self {
                         #(
@@ -258,7 +258,7 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
 
                 /// Create a new layout struct with all internal vectors initialized.
                 pub fn with_capacity(size: usize) -> Self {
-                    println!("Using struct-of-arrays for {}", stringify!(#struct_ident));
+                    // println!("Using struct-of-arrays for {}", stringify!(#struct_ident));
 
                     Self {
                         #(
@@ -347,7 +347,7 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
             impl #layout_struct_ident {
                 /// Create a new layout struct with an empty data vector.
                 pub fn new() -> Self {
-                    println!("Using array-of-structs for {}", stringify!(#struct_ident));
+                    // println!("Using array-of-structs for {}", stringify!(#struct_ident));
 
                     Self {
                         data: Vec::new(),
@@ -356,7 +356,7 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
 
                 /// Create a new layout struct with a pre-allocated vector
                 pub fn with_capacity(size: usize) -> Self {
-                    println!("Using array-of-structs for {}", stringify!(#struct_ident));
+                    // println!("Using array-of-structs for {}", stringify!(#struct_ident));
 
                     Self {
                         data: Vec::with_capacity(size),
