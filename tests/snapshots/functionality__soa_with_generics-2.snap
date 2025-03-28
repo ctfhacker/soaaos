@@ -1,0 +1,30 @@
+---
+source: tests/functionality.rs
+expression: nodes_aos
+snapshot_kind: text
+---
+NodeAossLayout {
+    data: [
+        NodeAos {
+            op: 0,
+            arg1: A,
+            arg2: Some(
+                B,
+            ),
+        },
+        NodeAos {
+            op: 1,
+            arg1: A,
+            arg2: Some(
+                B,
+            ),
+        },
+        NodeAos {
+            op: 2,
+            arg1: A,
+            arg2: Some(
+                B,
+            ),
+        },
+    ],
+}
