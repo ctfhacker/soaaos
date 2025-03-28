@@ -11,15 +11,6 @@ enum Layout {
     ArrayOfStructs,
 }
 
-/// You can optionally select the underlying storage layout:
-/// - Default (or `kind = "soa"`): struct-of-arrays (each field in its own Vec).
-/// - `kind = "aos"`: array-of-structs (a single Vec of the original struct).
-///
-/// In both cases the generated type (named `<OriginalName>Layout`) has:
-///   - `new() -> Self`
-///   - `add(item: OriginalStruct) -> usize`
-///   - For each field, a getter method (e.g. `get_fieldname(&self, index: usize) -> Option<&FieldType>`)
-
 /// Implement a Struct-of-Arrays or Array-of-Structs collection of a single struct
 ///
 /// Example:
@@ -29,14 +20,21 @@ enum Layout {
 /// /// The struct `NodesLayout` is created as a `struct-of-arrays`
 /// #[soaaos::layout("struct-of-arrays")]
 /// // #[layout("aos")] // For Array-of-Structs
-/// struct Node {
+/// struct Node<R> where R: Debug {
 ///   name: String,
 ///   operation: u8,
 ///   arg1: u16,
-///   arg2: u16,
+///   arg2: R,
 /// }
-///
 /// ```
+///
+/// Provides:
+///
+/// * `with_capacity(usize)`             - Initialize the layout with the given size for all `Vec`s
+/// * `add(&mut self, node: Node)`       - Add the node to the layout
+/// * `get_*(&self, id: NodeId)`         - Get `&field` of the node at the given index
+/// * `get_*_mut(&mut self, id: NodeId)` - Get `&mut field` of the node at the given index
+///
 #[proc_macro_attribute]
 pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
     // Parse the input item as a DeriveInput (i.e. a struct definition).
@@ -61,14 +59,16 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
     let struct_ident = input.ident.clone();
     let struct_ident_ref = Ident::new(&format!("{}Ref", struct_ident), struct_ident.span());
 
-    let layout_struct_ident = Ident::new(&format!("{}sLayout", struct_ident), struct_ident.span());
-    let layout_iter_ident = Ident::new(&format!("{}sIter", struct_ident), struct_ident.span());
-    let _layout_struct_ident_soa =
-        Ident::new(&format!("{}sLayoutSoa", struct_ident), struct_ident.span());
-    let _layout_struct_ident_aos =
-        Ident::new(&format!("{}sLayoutAos", struct_ident), struct_ident.span());
-    let error_ident = Ident::new(&format!("{}sError", struct_ident), struct_ident.span());
-    let id_ident = Ident::new(&format!("{}Id", struct_ident), struct_ident.span());
+    // Create the identifiers to be created
+    macro_rules! new_ident {
+        ($post:literal) => {
+            Ident::new(&format!($post, struct_ident), struct_ident.span())
+        };
+    }
+    let layout_struct_ident = new_ident!("{}sLayout");
+    let layout_iter_ident = new_ident!("{}sIter");
+    let error_ident = new_ident!("{}sError");
+    let id_ident = new_ident!("{}Id");
 
     // Only support structs with named fields.
     let fields = if let Data::Struct(data) = &input.data {
@@ -124,6 +124,9 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
         .map(|ident| Ident::new(&format!("NotFound_{}", ident), ident.span()))
         .collect();
 
+    // The ref iterator needs a lifetime prepending any given generics. Prepend a 'a lifetime to any
+    // given generics.
+    // <R> => <'a, R>
     let mut generics_with_lifetime = generics.clone();
     let lifetime = Lifetime::new("'a", impl_generics.span());
     generics_with_lifetime.params.insert(
@@ -131,17 +134,19 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
         GenericParam::Lifetime(LifetimeParam::new(lifetime.clone())),
     );
 
+    // Same as above but for ellided lifetimes
+    // <R> => <'_, R>
     let mut generics_with_ellided_lifetime = generics.clone();
-    let lifetime = Lifetime::new("'_", impl_generics.span());
+    let ellided_lifetime = Lifetime::new("'_", impl_generics.span());
     generics_with_ellided_lifetime.params.insert(
         0,
-        GenericParam::Lifetime(LifetimeParam::new(lifetime.clone())),
+        GenericParam::Lifetime(LifetimeParam::new(ellided_lifetime.clone())),
     );
 
+    // Create the code that is used in both struct-of-arrays and array-of-structs
     let both = quote! {
         // Keep the original struct definition.
         #input
-
 
         /// The index into the `nodes` vec
         #[allow(dead_code)]
@@ -161,7 +166,7 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
         #[derive(Debug)]
         pub struct #struct_ident_ref #generics_with_lifetime #where_clause {
             #(
-                pub #field_names: &'a #field_types,
+                pub #field_names: &#lifetime #field_types,
             )*
         }
 
@@ -196,6 +201,7 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         impl #impl_generics #layout_struct_ident #impl_generics #where_clause{
+            /// Returns the diff (by field) between two layouts
             pub fn diff(&self, other: &Self) -> Option<String> {
                 use std::fmt::Write;
 
@@ -236,6 +242,8 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
             layout: &'a #layout_struct_ident #impl_generics,
         }
 
+
+        // Iterate through all elements in the layout, returning a struct of refs to the internal fields
         impl #generics_with_lifetime Iterator for #layout_iter_ident #generics_with_lifetime #where_clause {
             type Item = #struct_ident_ref #generics_with_lifetime;
 
@@ -290,10 +298,12 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
                     }
                 }
 
+                /// Get the number of elements in the layout
                 pub fn len(&self) -> usize {
                     self.#first_field.len()
                 }
 
+                /// Returns `true` if the layout is empty
                 pub fn is_empty(&self) -> bool {
                     self.len() == 0
                 }
