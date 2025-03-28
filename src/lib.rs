@@ -1,6 +1,9 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Data, DeriveInput, Fields, LitStr, parse_macro_input};
+use syn::{
+    Data, DeriveInput, Fields, GenericParam, Ident, Lifetime, LifetimeParam, LitStr,
+    parse_macro_input, spanned::Spanned,
+};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum Layout {
@@ -39,6 +42,10 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
     // Parse the input item as a DeriveInput (i.e. a struct definition).
     let input = parse_macro_input!(item as DeriveInput);
 
+    let generics = input.generics.clone();
+
+    let (impl_generics, _ty_generics, where_clause) = generics.split_for_impl();
+
     // Parse the type of layout
     let layout;
     let text = parse_macro_input!(attr as LitStr);
@@ -52,17 +59,16 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     let struct_ident = input.ident.clone();
-    let struct_ident_ref = syn::Ident::new(&format!("{}Ref", struct_ident), struct_ident.span());
+    let struct_ident_ref = Ident::new(&format!("{}Ref", struct_ident), struct_ident.span());
 
-    let layout_struct_ident =
-        syn::Ident::new(&format!("{}sLayout", struct_ident), struct_ident.span());
-    let layout_iter_ident = syn::Ident::new(&format!("{}sIter", struct_ident), struct_ident.span());
+    let layout_struct_ident = Ident::new(&format!("{}sLayout", struct_ident), struct_ident.span());
+    let layout_iter_ident = Ident::new(&format!("{}sIter", struct_ident), struct_ident.span());
     let _layout_struct_ident_soa =
-        syn::Ident::new(&format!("{}sLayoutSoa", struct_ident), struct_ident.span());
+        Ident::new(&format!("{}sLayoutSoa", struct_ident), struct_ident.span());
     let _layout_struct_ident_aos =
-        syn::Ident::new(&format!("{}sLayoutAos", struct_ident), struct_ident.span());
-    let error_ident = syn::Ident::new(&format!("{}sError", struct_ident), struct_ident.span());
-    let id_ident = syn::Ident::new(&format!("{}Id", struct_ident), struct_ident.span());
+        Ident::new(&format!("{}sLayoutAos", struct_ident), struct_ident.span());
+    let error_ident = Ident::new(&format!("{}sError", struct_ident), struct_ident.span());
+    let id_ident = Ident::new(&format!("{}Id", struct_ident), struct_ident.span());
 
     // Only support structs with named fields.
     let fields = if let Data::Struct(data) = &input.data {
@@ -95,37 +101,47 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
     let field_types: Vec<_> = fields.iter().map(|f| &f.ty).collect();
 
     // Create getter method names for each field (e.g. get_field1).
-    let getter_names: Vec<syn::Ident> = field_names
+    let getter_names: Vec<Ident> = field_names
         .iter()
-        .map(|ident| syn::Ident::new(&format!("get_{}", ident), ident.span()))
+        .map(|ident| Ident::new(&format!("get_{}", ident), ident.span()))
         .collect();
 
     // Create getter method names for each field enumerated (e.g. get_field1_enumerated).
-    let getter_enumerated_names: Vec<syn::Ident> = field_names
+    let getter_enumerated_names: Vec<Ident> = field_names
         .iter()
-        .map(|ident| syn::Ident::new(&format!("get_{}_enumerated", ident), ident.span()))
+        .map(|ident| Ident::new(&format!("get_{}_enumerated", ident), ident.span()))
         .collect();
 
     // Create getter mut method names for each field (e.g. get_field1_mut).
-    let getter_mut_names: Vec<syn::Ident> = field_names
+    let getter_mut_names: Vec<Ident> = field_names
         .iter()
-        .map(|ident| syn::Ident::new(&format!("get_{}_mut", ident), ident.span()))
+        .map(|ident| Ident::new(&format!("get_{}_mut", ident), ident.span()))
         .collect();
 
     // Create getter method names for each field (e.g. get_field1).
-    let error_names: Vec<syn::Ident> = field_names
+    let error_names: Vec<Ident> = field_names
         .iter()
-        .map(|ident| syn::Ident::new(&format!("NotFound_{}", ident), ident.span()))
+        .map(|ident| Ident::new(&format!("NotFound_{}", ident), ident.span()))
         .collect();
+
+    let mut generics_with_lifetime = generics.clone();
+    let lifetime = Lifetime::new("'a", impl_generics.span());
+    generics_with_lifetime.params.insert(
+        0,
+        GenericParam::Lifetime(LifetimeParam::new(lifetime.clone())),
+    );
+
+    let mut generics_with_ellided_lifetime = generics.clone();
+    let lifetime = Lifetime::new("'_", impl_generics.span());
+    generics_with_ellided_lifetime.params.insert(
+        0,
+        GenericParam::Lifetime(LifetimeParam::new(lifetime.clone())),
+    );
 
     let both = quote! {
         // Keep the original struct definition.
         #input
 
-        pub struct #layout_iter_ident<'a> {
-            index: #id_ident,
-            layout: &'a #layout_struct_ident,
-        }
 
         /// The index into the `nodes` vec
         #[allow(dead_code)]
@@ -142,7 +158,8 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
 
-        pub struct #struct_ident_ref<'a> {
+        #[derive(Debug)]
+        pub struct #struct_ident_ref #generics_with_lifetime #where_clause {
             #(
                 pub #field_names: &'a #field_types,
             )*
@@ -178,8 +195,8 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
 
-        impl #layout_struct_ident {
-            pub fn diff(&self, other: &#layout_struct_ident) -> Option<String> {
+        impl #impl_generics #layout_struct_ident #impl_generics #where_clause{
+            pub fn diff(&self, other: &Self) -> Option<String> {
                 use std::fmt::Write;
 
                 let mut out = String::new();
@@ -202,11 +219,11 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
                 None
             }
 
-            pub fn iter(&self) -> #layout_iter_ident {
+            pub fn iter(&self) -> #layout_iter_ident #impl_generics {
                 #layout_iter_ident { index: #id_ident::null(), layout: self }
             }
 
-            pub fn iter_enumerated(&self) -> impl Iterator<Item = (#id_ident, #struct_ident_ref<'_>)> {
+            pub fn iter_enumerated(&self) -> impl Iterator<Item = (#id_ident, #struct_ident_ref #generics_with_ellided_lifetime)> {
                 self
                 .iter()
                 .enumerate()
@@ -214,8 +231,13 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
 
-        impl<'a> Iterator for #layout_iter_ident<'a> {
-            type Item = #struct_ident_ref<'a>;
+        pub struct #layout_iter_ident #generics_with_lifetime #where_clause {
+            index: #id_ident,
+            layout: &'a #layout_struct_ident #impl_generics,
+        }
+
+        impl #generics_with_lifetime Iterator for #layout_iter_ident #generics_with_lifetime #where_clause {
+            type Item = #struct_ident_ref #generics_with_lifetime;
 
             fn next(&mut self) -> Option<Self::Item> {
                 let result = #struct_ident_ref {
@@ -238,16 +260,16 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
 
             /// Layout version using struct-of-arrays layout.
             #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-            pub struct #layout_struct_ident {
+            pub struct #layout_struct_ident #impl_generics #where_clause {
                 #(
                     pub #field_names: Vec<#field_types>,
                 )*
             }
 
-            impl #layout_struct_ident {
+            impl #impl_generics #layout_struct_ident #impl_generics #where_clause {
                 /// Create a new layout struct with all internal vectors initialized.
                 pub fn new() -> Self {
-                    println!("Using struct-of-arrays for {}", stringify!(#struct_ident));
+                    // println!("Using struct-of-arrays for {}", stringify!(#struct_ident));
 
                     Self {
                         #(
@@ -256,9 +278,10 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
                     }
                 }
 
+
                 /// Create a new layout struct with all internal vectors initialized.
                 pub fn with_capacity(size: usize) -> Self {
-                    println!("Using struct-of-arrays for {}", stringify!(#struct_ident));
+                    // println!("Using struct-of-arrays for {}", stringify!(#struct_ident));
 
                     Self {
                         #(
@@ -278,7 +301,7 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
                 /// Add an instance of the original struct.
                 /// Each field value is pushed into its corresponding vector.
                 /// Returns the index of the newly inserted element.
-                pub fn add(&mut self, item: #struct_ident) -> #id_ident {
+                pub fn add(&mut self, item: #struct_ident #impl_generics) -> #id_ident {
                     let id = #id_ident(self.#first_field.len() as u32);
 
                     #(
@@ -328,7 +351,6 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
                         .ok_or_else(|| #error_ident::#error_names)
                     }
                 )*
-
             }
 
         };
@@ -340,14 +362,14 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
 
             /// Layout version using array-of-structs layout.
             #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-            pub struct #layout_struct_ident {
-                pub data: Vec<#struct_ident>,
+            pub struct #layout_struct_ident #impl_generics #where_clause {
+                pub data: Vec<#struct_ident #impl_generics>,
             }
 
-            impl #layout_struct_ident {
+            impl #impl_generics #layout_struct_ident #impl_generics #where_clause {
                 /// Create a new layout struct with an empty data vector.
                 pub fn new() -> Self {
-                    println!("Using array-of-structs for {}", stringify!(#struct_ident));
+                    // println!("Using array-of-structs for {}", stringify!(#struct_ident));
 
                     Self {
                         data: Vec::new(),
@@ -356,7 +378,7 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
 
                 /// Create a new layout struct with a pre-allocated vector
                 pub fn with_capacity(size: usize) -> Self {
-                    println!("Using array-of-structs for {}", stringify!(#struct_ident));
+                    // println!("Using array-of-structs for {}", stringify!(#struct_ident));
 
                     Self {
                         data: Vec::with_capacity(size),
@@ -374,7 +396,7 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
                 /// Add an instance of the original struct.
                 /// The entire struct is pushed into the internal vector.
                 /// Returns the index of the newly inserted element.
-                pub fn add(&mut self, item: #struct_ident) -> #id_ident {
+                pub fn add(&mut self, item: #struct_ident #impl_generics) -> #id_ident {
                     let id = #id_ident(self.data.len() as u32);
                     self.data.push(item);
                     id
