@@ -5,7 +5,8 @@ edition = "2024"
 
 [dependencies]
 quote = "1.0.37"
-syn = { version = "2.0.90", features = ["full"] }
+rand = "0.9.0"
+syn = { version = "2.0.90", features = ["full", "extra-traits"] }
 
 [lib]
 proc-macro = true
