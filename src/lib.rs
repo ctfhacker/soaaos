@@ -20,11 +20,26 @@ enum Layout {
 /// /// The struct `NodesLayout` is created as a `struct-of-arrays`
 /// #[soaaos::layout("struct-of-arrays")]
 /// // #[layout("aos")] // For Array-of-Structs
-/// struct Node<R> where R: Debug {
+/// struct Node<R> where R: std::fmt::Debug + PartialEq {
 ///   name: String,
 ///   operation: u8,
-///   arg1: u16,
 ///   arg2: R,
+/// }
+///
+/// #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+/// enum Fruit {
+///   Apple,
+///   Banana,
+/// }
+///
+/// fn main() {
+///    let mut nodes = NodesLayout::<Fruit>::new();
+///
+///    nodes.add(Node { name: "Node1".to_string(), operation: 1, arg2: Fruit::Apple });
+///    nodes.add(Node { name: "Node2".to_string(), operation: 2, arg2: Fruit::Banana });
+///    assert_eq!(nodes.len(), 2);
+///    assert_eq!(nodes.operation.iter().copied().collect::<Vec<_>>(), vec![1, 2]);
+///    assert_eq!(format!("{nodes:?}"), r#"NodesLayout { name: ["Node1", "Node2"], operation: [1, 2], arg2: [Apple, Banana] }"#);
 /// }
 /// ```
 ///
