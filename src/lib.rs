@@ -178,6 +178,14 @@ pub fn layout(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
 
+        impl std::convert::TryFrom<usize> for #id_ident {
+            type Error = std::num::TryFromIntError;
+
+            fn try_from(val: usize) -> std::result::Result<Self, Self::Error> {
+                Ok(#id_ident(u32::try_from(val)?))
+            }
+        }
+
         #[derive(Debug)]
         pub struct #struct_ident_ref #generics_with_lifetime #where_clause {
             #(
